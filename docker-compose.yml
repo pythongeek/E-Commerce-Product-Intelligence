@@ -1,0 +1,157 @@
+services:
+  api:
+    build: ./backend
+    container_name: productintel-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://app:devpassword@postgres:5432/product_intel}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
+      - FB_ACCESS_TOKEN=${FB_ACCESS_TOKEN}
+      - BRIGHT_DATA_USER=${BRIGHT_DATA_USER}
+      - BRIGHT_DATA_PASS=${BRIGHT_DATA_PASS}
+      - AMAZON_PA_API_KEY=${AMAZON_PA_API_KEY}
+      - AMAZON_PA_API_SECRET=${AMAZON_PA_API_SECRET}
+      - AMAZON_ASSOCIATE_TAG=${AMAZON_ASSOCIATE_TAG}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-product-intel-super-secret-change-in-prod}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+    networks:
+      - productintel
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build: ./backend
+    container_name: productintel-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info -Q scraping,analysis,notifications --concurrency=4
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://app:devpassword@postgres:5432/product_intel}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
+      - FB_ACCESS_TOKEN=${FB_ACCESS_TOKEN}
+      - BRIGHT_DATA_USER=${BRIGHT_DATA_USER}
+      - BRIGHT_DATA_PASS=${BRIGHT_DATA_PASS}
+      - AMAZON_PA_API_KEY=${AMAZON_PA_API_KEY}
+      - AMAZON_PA_API_SECRET=${AMAZON_PA_API_SECRET}
+      - AMAZON_ASSOCIATE_TAG=${AMAZON_ASSOCIATE_TAG}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET:-product-intel-super-secret-change-in-prod}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+    networks:
+      - productintel
+    restart: unless-stopped
+
+  beat:
+    build: ./backend
+    container_name: productintel-beat
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://app:devpassword@postgres:5432/product_intel}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
+      - JWT_SECRET=${JWT_SECRET:-product-intel-super-secret-change-in-prod}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+    networks:
+      - productintel
+    restart: unless-stopped
+
+  flower:
+    build: ./backend
+    container_name: productintel-flower
+    command: celery flower --broker=redis://redis:6379/0 --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - productintel
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: productintel-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - productintel
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: productintel-postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      POSTGRES_DB: product_intel
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5432:5432"
+    networks:
+      - productintel
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d product_intel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: productintel-redis
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - productintel
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  productintel:
+    driver: bridge
