@@ -1,0 +1,59 @@
+# FastAPI & Server
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+gunicorn==23.0.0
+python-multipart==0.0.17
+
+# Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+asyncpg==0.30.0
+
+# Redis & Cache
+redis==5.2.0
+
+# HTTP Client
+httpx[http2]==0.27.2
+tenacity==9.0.0
+
+# Scrapers
+playwright==1.49.0
+pytrends-modern==1.1.0
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# Auth & Security
+pyjwt==2.10.0
+bcrypt==4.2.1
+cryptography==44.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Task Queue
+celery==5.4.0
+flower==2.0.1
+
+# AI / NLP
+openai==1.55.0
+transformers==4.46.3
+torch==2.5.1
+sentencepiece==0.2.0
+
+# Validation & Serialization
+pydantic==2.9.2
+pydantic-settings==2.6.1
+email-validator==2.2.0
+
+# Monitoring & Logging
+structlog==24.4.0
+prometheus-client==0.21.0
+sentry-sdk==2.19.0
+
+# Utilities
+pyyaml==6.0.2
+python-dotenv==1.0.1
+jinja2==3.1.4
+orjson==3.10.12
+pandas==2.2.3
+numpy==2.1.3
